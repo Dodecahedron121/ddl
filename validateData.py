@@ -12,26 +12,77 @@ level_list_schema = {
     }
 }
 
+banned_schema = {
+    "type": "object",
+    "patternProperties": {
+        "^[0-9]+$": {
+            "type": "array",
+            "items": {
+                "type": "number"
+            }
+        }
+    },
+}
+
+editors_supporters_schema = {
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "role": {"type": "string"},
+            "members": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "number"},
+                        "link": {"type": "string"}
+                    }
+                }
+            }
+        }
+    }
+}
+	
+
+tags_schema = {
+    "type": "array",
+    "items": {
+        "type": "object",
+		"properties": {
+            "name": {"type": "string"},
+            "description": {"type": "string"}
+        }
+    }
+}
+
 level_schema = {
     "type": "object",
     "properties": {
         "id": {"type": "number"},
         "name": {"type": "string"},
-        "author": {"type": "string"},
+        "description": {"type": "string"},
+        "author": {"type": "number"},
         "creators": {
+            "type": "array",
+            "items": {
+                "type": "number",
+            }
+        },
+        "tags": {
             "type": "array",
             "items": {
                 "type": "string",
             }
         },
-        "verifier": {"type": "string"},
+        "verifier": {"type": "number"},
         "verification": {"type": "string"},
         "records": {
             "type": "array",
             "items": {
                 "type": "object",
                 "properties": {
-                    "user": {"type": "string"},
+                    "user": {"type": "number"},
                     "link": {"type": "string"},
                     "percent": {"type": "number"},
                     "hz": {"type": "number"},
@@ -82,9 +133,15 @@ def validate_data():
     current_dir = os.path.join(os.getcwd(), "data")
     list_path = os.path.join(current_dir, "_list.json")
     legacy_list_path = os.path.join(current_dir, "_legacy.json")
+    banned_path = os.path.join(current_dir, "_leaderboard_banned.json")
     pack_list_path = os.path.join(current_dir, "_packlist.json")
     pack_tiers_path = os.path.join(current_dir, "_packtiers.json")
+    tags_path = os.path.join(current_dir, "_tags.json")
+    name_map_path = os.path.join(current_dir, "_name_map.json")
+    editors_path = os.path.join(current_dir, "_editors.json")
+    supporters_path = os.path.join(current_dir, "_supporters.json")
     had_error = False
+
     with open(list_path, "r", encoding='utf-8') as file:
         try:
             levels = json.load(file)
@@ -95,6 +152,31 @@ def validate_data():
         except exceptions.ValidationError as e:
             print(f"Validation failed for _list.json: {str(e)}")
             sys.exit(1)
+            
+    with open(banned_path, "r", encoding='utf-8') as file:
+        try:
+            banned = json.load(file)
+            validate(instance=banned, schema=banned_schema)
+        except ValueError as e:
+            print(f"Invalid json in file _leaderboard_banned.json: {str(e)}")
+            sys.exit(1)
+        except exceptions.ValidationError as e:
+            print(f"Validation failed for _leaderboard_banned.json: {str(e)}")
+            sys.exit(1)
+
+    available_tags = set()
+    with open(tags_path, "r", encoding='utf-8') as file:
+        try:
+            tags = json.load(file)
+            validate(instance=tags, schema=tags_schema)
+            available_tags = {tag["name"] for tag in tags}
+        except ValueError as e:
+            print(f"Invalid json in file _tags.json: {str(e)}")
+            sys.exit(1)
+        except exceptions.ValidationError as e:
+            print(f"Validation failed for _tags.json: {str(e)}")
+            sys.exit(1)
+
 
     with open(legacy_list_path, "r", encoding='utf-8') as file:
         try:
@@ -137,6 +219,38 @@ def validate_data():
             print(f"Validation failed for _packtiers.json: {str(e)}")
             sys.exit(1)
 
+    with open(name_map_path, "r", encoding='utf-8') as file:
+        try:
+            name_map = json.load(file)
+        except ValueError as e:
+            print(f"Invalid json in file _name_map.json: {str(e)}")
+            sys.exit(1)
+
+    def validate_user(user_id):
+        return str(user_id) in name_map
+    
+    with open(editors_path, "r", encoding='utf-8') as file:
+        try:
+            editors = json.load(file)
+            validate(instance=editors, schema=editors_supporters_schema)
+        except ValueError as e:
+            print(f"Invalid json in file _editors.json: {str(e)}")
+            sys.exit(1)
+        except exceptions.ValidationError as e:
+            print(f"Validation failed for _editors.json: {str(e)}")
+            sys.exit(1)
+    
+    with open(supporters_path, "r", encoding='utf-8') as file:
+        try:
+            supporters = json.load(file)
+            validate(instance=supporters, schema=editors_supporters_schema)
+        except ValueError as e:
+            print(f"Invalid json in file _supporters.json: {str(e)}")
+            sys.exit(1)
+        except exceptions.ValidationError as e:
+            print(f"Validation failed for _supporters.json: {str(e)}")
+            sys.exit(1)
+
     level_ids = {}
     for filename in levels:
         file_path = os.path.join(current_dir, f"{filename}.json")
@@ -166,7 +280,12 @@ def validate_data():
                 level_ids[level_id] = filename
 
                 records = data["records"]
-                names = [data["verifier"].lower()]
+                names = [data["verifier"]]
+
+                if not validate_user(data["verifier"]):
+                    had_error = True
+                    print(f"Invalid verifier: {filename}: {data['verifier']}")
+                
                 try:
                     validator(data["verification"])
                 except ValidationError:
@@ -175,10 +294,14 @@ def validate_data():
 
                 for record in records:
 
-                    name = record["user"].lower()
+                    name = record["user"]
                     if name in names:
                         had_error = True
                         print(f"Duplicate Record: {filename}: {name}")
+
+                    if not validate_user(name):
+                        had_error = True
+                        print(f"Invalid username: {filename}: {name}")
 
                     names.append(name)
                     url = record["link"]
@@ -188,19 +311,21 @@ def validate_data():
                         had_error = True
                         print(f"Invalid Url: {filename} {name}: {url}")
 
-                if "" in names:
-                    had_error = True
-                    print(f"Empty username in {filename}")
+                if "tags" in data:
+                    for tag_name in data["tags"]:
+                        if tag_name not in available_tags:
+                            had_error = True
+                            print(f"Unrecognized tag: {filename}: {tag_name}")
 
                 creators = []
                 for creator in data["creators"]:
                     if creator in creators:
                         had_error = True
                         print(f"Duplicate Creator: {filename}: {creator}")
-
-                    if "," in creator:
+                    if not validate_user(creator):
                         had_error = True
-                        print(f"Invalid Creator: {filename}: {creator}")
+                        print(f"Invalid creator: {filename}: {creator}")
+
                     creators.append(creator)
         except FileNotFoundError:
             had_error = True
@@ -234,6 +359,18 @@ def validate_data():
     for pack in pack_names_unused:
         had_error = True
         print(f"Pack \"{pack}\" is not assigned to a tier")
+
+    for role in editors:
+        for member in role["members"]:
+            if not validate_user(member["name"]):
+                had_error = True
+                print(f"Unknown editor: {member['name']} ({role['role']})")
+    for role in supporters:
+        for member in role["members"]:
+            if not validate_user(member["name"]):
+                had_error = True
+                print(f"Unknown supporter: {member['name']}")
+
                 
     if had_error:
         sys.exit(1)
