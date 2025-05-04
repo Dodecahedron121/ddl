@@ -1,5 +1,29 @@
-## Welcome to the old and soon to be replaced main repository
+# aredl-revamp
 
-The main branch contained the very first AREDL page and is now only used to store the current list data in it's legacy format. Until **[aredl-backend-v2](https://github.com/All-Rated-Extreme-Demon-List/aredl-backend-v2) (Currently Private)** is fully integrated this data is continuously migrated over to the backends.
+This template should help get you started developing with Vue 3 in Vite.
 
-The source code of our current [website](https://aredl.net) can be found in the **[Aredl-Revamp branch](https://github.com/All-Rated-Extreme-Demon-List/AREDL/tree/aredl-revamp)**.
+## Recommended IDE Setup
+
+[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur) + [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin).
+
+## Customize configuration
+
+See [Vite Configuration Reference](https://vitejs.dev/config/).
+
+## Project Setup
+
+```sh
+npm install
+```
+
+### Compile and Hot-Reload for Development
+
+```sh
+npm run dev
+```
+
+### Compile and Minify for Production
+
+```sh
+npm run build
+```
